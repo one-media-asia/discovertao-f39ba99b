@@ -26,18 +26,10 @@ const Account = () => {
         return;
       }
 
-      // Get user profile from profiles table
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
       setUser({
         id: user.id,
         email: user.email || '',
         created_at: user.created_at,
-        ...profile
       });
       setLoading(false);
     };
