@@ -63,80 +63,45 @@ const       BookingPage: React.FC = () => {
       const amountMajor = depositMajor + totalAddons;
       const addonsText = ADDONS.filter(a => selectedAddons[a.id]).map(a => a.label).join(', ') || 'None';
 
-      // Prepare Web3Forms payload
-      const payload = {
-        access_key: 'e4c4edf6-6e35-456a-87da-b32b961b449a',
-        to: 'payments@divinginasia.com',
-        subject: `Booking Inquiry: ${itemTitle}`,
+      // Save to database
+      const { error: dbError } = await supabase.from('booking_inquiries').insert({
+        course_title: itemTitle,
         name: data.name,
         email: data.email,
-        phone: data.phone || 'N/A',
-        preferred_date: data.preferred_date || 'N/A',
-        experience_level: data.experience_level || 'N/A',
-        payment_choice: data.paymentChoice === 'now' ? 'Pay deposit now via PayPal' : 'Pay later (inquire only)',
-        paypal_link: data.paymentChoice === 'now' ? `${PAYPAL_LINK}/${amountMajor}THB` : null,
-        item_title: itemTitle,
-        deposit_amount: `฿${amountMajor}`,
-        addons: addonsText,
-        message: data.message || 'No additional message',
-      };
-
-      console.log('Sending booking payload to Web3Forms', payload);
-
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        phone: data.phone || null,
+        preferred_date: data.preferred_date || null,
+        experience_level: data.experience_level || null,
+        message: `Add-ons: ${addonsText}\nDeposit: ฿${amountMajor}\n\n${data.message || ''}`,
       });
 
-      const responseData = await res.json().catch(() => ({}));
-      console.log('Web3Forms response:', res.status, responseData);
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        toast.error('Failed to save inquiry. Please try again.');
+        return;
+      }
 
-      // Persist booking via local API
-      try {
-        const bookingId = crypto.randomUUID();
-        const body = {
-          id: bookingId,
+      // Send email notification
+      await supabase.functions.invoke('send-booking-notification', {
+        body: {
           name: data.name,
           email: data.email,
           phone: data.phone,
-          course_title: itemTitle,
           preferred_date: data.preferred_date,
           experience_level: data.experience_level,
           message: data.message,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        };
+          item_title: itemTitle,
+          deposit_amount: amountMajor,
+          payment_choice: data.paymentChoice,
+          paypal_link: data.paymentChoice === 'now' ? `${PAYPAL_LINK}/${amountMajor}THB` : null,
+        },
+      });
 
-        const fnRes = await fetch('/api/bookings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-
-        if (!fnRes.ok) {
-          const errText = await fnRes.text().catch(() => 'unknown');
-          console.warn('Local API persist failed', fnRes.status, errText);
-        } else {
-          console.log('Booking persisted via local API', bookingId);
-        }
-      } catch (e) {
-        console.warn('Failed to persist booking via local API', e);
-      }
-
-      // Notify user based on Web3Forms result, but booking is already persisted
-      if (res.ok && responseData.success) {
-        toast.success('Inquiry sent! You can now pay your deposit via PayPal below.');
-        if (data.paymentChoice === 'now' && amountMajor > 0) {
-          setShowPaymentLinks(true);
-        } else {
-          form.reset();
-          navigate('/');
-        }
+      toast.success('Inquiry sent! We will get back to you soon.');
+      if (data.paymentChoice === 'now' && amountMajor > 0) {
+        setShowPaymentLinks(true);
       } else {
-        const errMsg = responseData?.message || responseData?.error || `HTTP ${res.status}`;
-        console.error('Web3Forms error:', errMsg, responseData);
-        toast.error(`Inquiry saved but delivery failed: ${errMsg}. Admin will be notified.`);
+        form.reset();
+        navigate('/');
       }
     } catch (err) {
       console.error('Form submission error:', err);
