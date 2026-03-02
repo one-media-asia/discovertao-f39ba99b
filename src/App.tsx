@@ -19,6 +19,7 @@ import Account from "./pages/Account";
 import Login from "./pages/Login";
 import Courses from "./components/Courses";
 import ProLevelCourses from "./pages/ProLevelCourses";
+import MSDTProgram from "./pages/MSDTProgram";
 import SpecialtyDetail from "./pages/SpecialtyDetail";
 import DiveSitesPage from "./pages/DiveSitesPage";
 import SailRock from "./pages/SailRock";
@@ -122,6 +123,7 @@ const App = () => (
           <Route path="/account" element={<Account />} />
           <Route path="/courses/pro-level" element={<ProLevelCourses />} />
           <Route path="/courses/specialties/:slug" element={<SpecialtyDetail />} />
+          <Route path="/courses/msdt" element={<MSDTProgram />} />
           
           {/* Specialty Course Routes */}
           <Route path="/specialty/deep-diver" element={<DeepDiver />} />
