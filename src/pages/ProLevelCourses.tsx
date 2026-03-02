@@ -12,7 +12,7 @@ const ProLevelCourses: React.FC = () => {
     { title: 'EFR Instructor Course' },
     { title: 'PADI MSDT Program', path: '/courses/msdt' },
     { title: 'IDC Staff Instructor' },
-    { title: 'PADI IDC Schedule' },
+    { title: 'PADI IDC Schedule', path: '/courses/idc-schedule' },
     { title: 'Instructor Specialties' },
     { title: 'AWARE Fish ID' },
     { title: 'Boat Instructor' },
