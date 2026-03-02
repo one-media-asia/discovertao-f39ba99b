@@ -8,6 +8,7 @@ import Courses from '../components/Courses';
 import Gallery from '../components/Gallery';
 import About from '../components/About';
 import Contact from '../components/Contact';
+import FunDivingSection from '../components/FunDivingSection';
 
 const Index = () => {
   const location = useLocation();
@@ -27,6 +28,7 @@ const Index = () => {
       <About />
       <DiveSites />
       <Courses />
+      <FunDivingSection />
       <Gallery />
       <Contact />
     </div>
