@@ -1,56 +1,85 @@
-// Supabase Edge Function: insert booking using service_role key
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL');
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization',
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('', {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization',
-      },
-    });
+    return new Response('', { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization' } });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: 'Server misconfigured' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization' } });
-    }
-
     const body = await req.json();
 
-    // Ensure created_at exists
-    if (!body.created_at) body.created_at = new Date().toISOString();
+    // Input validation
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '';
+    const email = typeof body.email === 'string' ? body.email.trim().slice(0, 255) : '';
+    const course_title = typeof body.course_title === 'string' ? body.course_title.trim().slice(0, 200) : '';
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/booking_inquiries`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify(body),
+    if (!name || !email || !course_title) {
+      return new Response(JSON.stringify({ error: 'Name, email, and course title are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(JSON.stringify({ error: 'Invalid email format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 20) : null;
+    const preferred_date = typeof body.preferred_date === 'string' ? body.preferred_date.slice(0, 10) : null;
+    const experience_level = typeof body.experience_level === 'string' ? body.experience_level.trim().slice(0, 50) : null;
+    const message = typeof body.message === 'string' ? body.message.trim().slice(0, 1000) : null;
+
+    // Use anon key instead of service_role to respect RLS
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+    );
+
+    const { error } = await supabase.from('booking_inquiries').insert({
+      name,
+      email,
+      course_title,
+      phone,
+      preferred_date,
+      experience_level,
+      message,
     });
 
-    const text = await res.text();
-    if (!res.ok) {
-      return new Response(JSON.stringify({ error: text || 'Insert failed' }), { status: res.status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization' } });
+    if (error) {
+      console.error('Insert error:', error);
+      return new Response(JSON.stringify({ error: 'Failed to save booking' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({ status: 'ok' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, apikey, Authorization' } });
+    console.error('Booking function error:', err);
+    return new Response(JSON.stringify({ error: 'An error occurred processing your request' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

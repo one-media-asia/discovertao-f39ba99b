@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingInquiry {
   id: string;
@@ -19,83 +20,80 @@ interface BookingInquiry {
   preferred_date: string | null;
   experience_level: string | null;
   message: string | null;
-  status: string;
   created_at: string;
 }
-
-const statusConfig = {
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
-  confirmed: { label: 'Confirmed', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
-  completed: { label: 'Completed', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
-};
 
 const Admin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingInquiry[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    // For local testing, just fetch bookings (no auth required)
-    fetchBookings();
+    checkAuthAndFetch();
   }, []);
+
+  const checkAuthAndFetch = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate('/admin/login');
+      return;
+    }
+    // Check admin role
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      toast.error('Admin access required');
+      navigate('/admin/login');
+      return;
+    }
+    await fetchBookings();
+  };
 
   const fetchBookings = async () => {
     try {
-      const response = await fetch('/api/bookings');
-      if (!response.ok) throw new Error('Failed to fetch bookings');
-      const data = await response.json();
-      setBookings(data);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
+      const { data, error } = await supabase
+        .from('booking_inquiries')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        toast.error('Failed to load bookings');
+        return;
+      }
+      setBookings(data || []);
+    } catch {
       toast.error('Failed to load bookings');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleStatusChange = async (bookingId: string, newStatus: string) => {
-    try {
-      const response = await fetch(`/api/bookings/${bookingId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!response.ok) throw new Error('Failed to update status');
-
-      // Refetch bookings to ensure UI is up to date
-      await fetchBookings();
-      toast.success(`Status updated to ${statusConfig[newStatus as keyof typeof statusConfig]?.label || newStatus}`);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
-
   const handleDeleteBooking = async () => {
     if (!deleteId) return;
-
     try {
-      const response = await fetch(`/api/bookings/${deleteId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete booking');
+      const { error } = await supabase
+        .from('booking_inquiries')
+        .delete()
+        .eq('id', deleteId);
 
-      // Refetch bookings to ensure UI is up to date
+      if (error) throw error;
       await fetchBookings();
       setDeleteId(null);
       toast.success('Booking deleted successfully');
-    } catch (error) {
-      console.error('Error deleting booking:', error);
+    } catch {
       toast.error('Failed to delete booking');
     }
   };
 
   const handleSendInvoice = async (booking: BookingInquiry) => {
     try {
-      const amount = booking.message || booking.course_title || '';
       const payload = {
         access_key: 'e4c4edf6-6e35-456a-87da-b32b961b449a',
         to: booking.email,
@@ -113,32 +111,20 @@ const Admin = () => {
 
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success) {
-        toast.success('Invoice sent via Web3Forms');
+        toast.success('Invoice sent');
       } else {
-        console.error('Web3Forms invoice error', res.status, json);
-        toast.error('Failed to send invoice via Web3Forms');
+        toast.error('Failed to send invoice');
       }
-    } catch (err) {
-      console.error('Send invoice error', err);
+    } catch {
       toast.error('Failed to send invoice');
     }
   };
 
-  const filteredBookings = statusFilter === 'all' 
-    ? bookings 
-    : bookings.filter(b => b.status === statusFilter);
-
-  const getStatusCounts = () => {
-    return {
-      all: bookings.length,
-      pending: bookings.filter(b => b.status === 'pending').length,
-      confirmed: bookings.filter(b => b.status === 'confirmed').length,
-      completed: bookings.filter(b => b.status === 'completed').length,
-      cancelled: bookings.filter(b => b.status === 'cancelled').length,
-    };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+    toast.success('Logged out successfully');
   };
-
-  const counts = getStatusCounts();
 
   if (isLoading) {
     return (
@@ -147,11 +133,6 @@ const Admin = () => {
       </div>
     );
   }
-
-  const handleLogout = async () => {
-    navigate('/');
-    toast.success('Logged out successfully');
-  };
 
   return (
     <div className="min-h-screen bg-muted">
@@ -170,55 +151,14 @@ const Admin = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Status Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold">{counts.all}</div>
-              <div className="text-sm text-muted-foreground">All</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-yellow-200" onClick={() => setStatusFilter('pending')}>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{counts.pending}</div>
-              <div className="text-sm text-muted-foreground">Pending</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-green-200" onClick={() => setStatusFilter('confirmed')}>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{counts.confirmed}</div>
-              <div className="text-sm text-muted-foreground">Confirmed</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-blue-200" onClick={() => setStatusFilter('completed')}>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{counts.completed}</div>
-              <div className="text-sm text-muted-foreground">Completed</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-red-200" onClick={() => setStatusFilter('cancelled')}>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">{counts.cancelled}</div>
-              <div className="text-sm text-muted-foreground">Cancelled</div>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Users className="h-5 w-5" /> Booking Inquiries
-              </span>
-              {statusFilter !== 'all' && (
-                <Badge variant="outline" className="cursor-pointer" onClick={() => setStatusFilter('all')}>
-                  Showing: {statusFilter} × Clear
-                </Badge>
-              )}
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" /> Booking Inquiries ({bookings.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredBookings.length === 0 ? (
+            {bookings.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No booking inquiries found.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -226,7 +166,6 @@ const Admin = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
@@ -238,80 +177,45 @@ const Admin = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredBookings.map((booking) => {
-                      const status = statusConfig[booking.status as keyof typeof statusConfig] || statusConfig.pending;
-                      return (
-                        <TableRow key={booking.id}>
-                          <TableCell className="whitespace-nowrap">
-                            {format(new Date(booking.created_at), 'MMM d, yyyy HH:mm')}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={booking.status || 'pending'}
-                              onValueChange={(value) => handleStatusChange(booking.id, value)}
+                    {bookings.map((booking) => (
+                      <TableRow key={booking.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {format(new Date(booking.created_at), 'MMM d, yyyy HH:mm')}
+                        </TableCell>
+                        <TableCell className="font-medium">{booking.name}</TableCell>
+                        <TableCell>
+                          <a href={`mailto:${booking.email}`} className="text-blue-600 hover:underline">
+                            {booking.email}
+                          </a>
+                        </TableCell>
+                        <TableCell>{booking.phone || '-'}</TableCell>
+                        <TableCell>{booking.course_title}</TableCell>
+                        <TableCell>
+                          {booking.preferred_date
+                            ? format(new Date(booking.preferred_date), 'MMM d, yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell>{booking.experience_level || '-'}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={booking.message || ''}>
+                          {booking.message || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteId(booking.id)}
+                              className="text-destructive hover:text-destructive"
                             >
-                              <SelectTrigger className={`w-32 ${status.color} border`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">
-                                  <span className="flex items-center gap-2">
-                                    <Clock className="h-3 w-3" /> Pending
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="confirmed">
-                                  <span className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3" /> Confirmed
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="completed">
-                                  <span className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3" /> Completed
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                  <span className="flex items-center gap-2">
-                                    <XCircle className="h-3 w-3" /> Cancelled
-                                  </span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="font-medium">{booking.name}</TableCell>
-                          <TableCell>
-                            <a href={`mailto:${booking.email}`} className="text-blue-600 hover:underline">
-                              {booking.email}
-                            </a>
-                          </TableCell>
-                          <TableCell>{booking.phone || '-'}</TableCell>
-                          <TableCell>{booking.course_title}</TableCell>
-                          <TableCell>
-                            {booking.preferred_date 
-                              ? format(new Date(booking.preferred_date), 'MMM d, yyyy')
-                              : '-'}
-                          </TableCell>
-                          <TableCell>{booking.experience_level || '-'}</TableCell>
-                          <TableCell className="max-w-xs truncate" title={booking.message || ''}>
-                            {booking.message || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => setDeleteId(booking.id)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleSendInvoice(booking)}>
-                                Send Invoice
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleSendInvoice(booking)}>
+                              Send Invoice
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -320,7 +224,6 @@ const Admin = () => {
         </Card>
       </main>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
@@ -330,12 +233,8 @@ const Admin = () => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteBooking}>
-              Delete
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteBooking}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
