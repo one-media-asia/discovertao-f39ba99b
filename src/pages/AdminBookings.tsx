@@ -218,6 +218,7 @@ const AdminBookings = () => {
                       <TableHead>Payment</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Ref</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -244,6 +245,38 @@ const AdminBookings = () => {
                         <TableCell>{statusBadge(b.booking_status)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {b.payment_reference || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={b.booking_status === 'completed'}
+                              onClick={() =>
+                                updateBooking(
+                                  b.id,
+                                  { booking_status: 'completed' },
+                                  'Booking marked as completed',
+                                )
+                              }
+                            >
+                              <CheckSquare className="h-3.5 w-3.5 mr-1" /> Complete
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={b.payment_status === 'refunded'}
+                              onClick={() =>
+                                updateBooking(
+                                  b.id,
+                                  { payment_status: 'refunded', booking_status: 'cancelled' },
+                                  'Booking refunded',
+                                )
+                              }
+                            >
+                              <Undo2 className="h-3.5 w-3.5 mr-1" /> Refund
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
