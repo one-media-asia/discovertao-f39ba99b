@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Search, RefreshCw, LogOut, ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Search, RefreshCw, LogOut, ArrowLeft, CheckCircle2, Clock, XCircle, CheckSquare, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,7 +93,7 @@ const AdminBookings = () => {
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .in('booking_status', ['confirmed', 'completed'])
+        .in('booking_status', ['confirmed', 'completed', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -107,6 +107,23 @@ const AdminBookings = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const updateBooking = async (
+    id: string,
+    updates: { booking_status?: BookingStatus; payment_status?: PaymentStatus },
+    successMessage: string,
+  ) => {
+    const { error } = await supabase.from('bookings').update(updates).eq('id', id);
+    if (error) {
+      console.error('Update failed:', error);
+      toast.error('Failed to update booking');
+      return;
+    }
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+    );
+    toast.success(successMessage);
   };
 
   const handleLogout = async () => {
@@ -180,6 +197,7 @@ const AdminBookings = () => {
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -201,6 +219,7 @@ const AdminBookings = () => {
                       <TableHead>Payment</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Ref</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -227,6 +246,38 @@ const AdminBookings = () => {
                         <TableCell>{statusBadge(b.booking_status)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {b.payment_reference || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={b.booking_status === 'completed'}
+                              onClick={() =>
+                                updateBooking(
+                                  b.id,
+                                  { booking_status: 'completed' },
+                                  'Booking marked as completed',
+                                )
+                              }
+                            >
+                              <CheckSquare className="h-3.5 w-3.5 mr-1" /> Complete
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={b.payment_status === 'refunded'}
+                              onClick={() =>
+                                updateBooking(
+                                  b.id,
+                                  { payment_status: 'refunded', booking_status: 'cancelled' },
+                                  'Booking refunded',
+                                )
+                              }
+                            >
+                              <Undo2 className="h-3.5 w-3.5 mr-1" /> Refund
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
