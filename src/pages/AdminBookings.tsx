@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Search, RefreshCw, LogOut, ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Search, RefreshCw, LogOut, ArrowLeft, CheckCircle2, Clock, XCircle, CheckSquare, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
