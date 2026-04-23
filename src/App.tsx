@@ -32,6 +32,7 @@ import MangoBay from "./pages/MangoBay";
 import BookingPage from "./pages/BookingPage";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
+import AdminBookings from "./pages/AdminBookings";
 import AdminLogin from "./pages/AdminLogin";
 import MarineLifePage from "./pages/MarineLifePage";
 import Whaleshark from "./pages/Whaleshark";
@@ -151,6 +152,7 @@ const App = () => (
 
           <Route path="/booking" element={<BookingPage />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/bookings" element={<AdminBookings />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
