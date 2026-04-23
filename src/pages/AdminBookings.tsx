@@ -36,7 +36,7 @@ type StatusFilter = 'all' | BookingStatus;
 const paymentBadge = (s: PaymentStatus) => {
   switch (s) {
     case 'paid':
-      return <Badge className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Paid</Badge>;
+      return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" />Paid</Badge>;
     case 'refunded':
       return <Badge variant="outline"><XCircle className="h-3 w-3 mr-1" />Refunded</Badge>;
     default:
@@ -45,12 +45,14 @@ const paymentBadge = (s: PaymentStatus) => {
 };
 
 const statusBadge = (s: BookingStatus) => {
-  const map: Record<BookingStatus, string> = {
-    confirmed: 'bg-blue-600 hover:bg-blue-700',
-    completed: 'bg-emerald-600 hover:bg-emerald-700',
-    cancelled: 'bg-destructive hover:bg-destructive/90',
-  };
-  return <Badge className={map[s]}>{s.charAt(0).toUpperCase() + s.slice(1)}</Badge>;
+  switch (s) {
+    case 'confirmed':
+      return <Badge variant="default">Confirmed</Badge>;
+    case 'completed':
+      return <Badge className="bg-accent text-accent-foreground">Completed</Badge>;
+    case 'cancelled':
+      return <Badge variant="destructive">Cancelled</Badge>;
+  }
 };
 
 const AdminBookings = () => {
