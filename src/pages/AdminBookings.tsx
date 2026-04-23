@@ -93,7 +93,7 @@ const AdminBookings = () => {
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .in('booking_status', ['confirmed', 'completed'])
+        .in('booking_status', ['confirmed', 'completed', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
