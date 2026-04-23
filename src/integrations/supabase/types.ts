@@ -71,6 +71,68 @@ export type Database = {
         }
         Relationships: []
       }
+      bookings: {
+        Row: {
+          amount: number | null
+          booking_date: string | null
+          booking_status: Database["public"]["Enums"]["booking_status"]
+          course_title: string
+          created_at: string
+          currency: string
+          email: string
+          id: string
+          inquiry_id: string | null
+          name: string
+          notes: string | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          booking_date?: string | null
+          booking_status?: Database["public"]["Enums"]["booking_status"]
+          course_title: string
+          created_at?: string
+          currency?: string
+          email: string
+          id?: string
+          inquiry_id?: string | null
+          name: string
+          notes?: string | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          booking_date?: string | null
+          booking_status?: Database["public"]["Enums"]["booking_status"]
+          course_title?: string
+          created_at?: string
+          currency?: string
+          email?: string
+          id?: string
+          inquiry_id?: string | null
+          name?: string
+          notes?: string | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "booking_inquiries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -107,6 +169,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      booking_status: "confirmed" | "completed" | "cancelled"
+      payment_status: "pending" | "paid" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -235,6 +299,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      booking_status: ["confirmed", "completed", "cancelled"],
+      payment_status: ["pending", "paid", "refunded"],
     },
   },
 } as const
