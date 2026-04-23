@@ -109,6 +109,23 @@ const AdminBookings = () => {
     }
   };
 
+  const updateBooking = async (
+    id: string,
+    updates: { booking_status?: BookingStatus; payment_status?: PaymentStatus },
+    successMessage: string,
+  ) => {
+    const { error } = await supabase.from('bookings').update(updates).eq('id', id);
+    if (error) {
+      console.error('Update failed:', error);
+      toast.error('Failed to update booking');
+      return;
+    }
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+    );
+    toast.success(successMessage);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
