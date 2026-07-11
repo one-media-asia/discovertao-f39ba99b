@@ -36,8 +36,8 @@ serve(async (req) => {
     const client = new SMTPClient({
       connection: {
         hostname: Deno.env.get("SMTP_HOST") || "",
-        port: Number(Deno.env.get("SMTP_PORT") || "587"),
-        tls: false,
+        port: 465,
+        tls: true,
         auth: {
           username: Deno.env.get("SMTP_USER") || "",
           password: Deno.env.get("SMTP_PASS") || "",
